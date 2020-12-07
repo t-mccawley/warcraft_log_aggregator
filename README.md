@@ -1,2 +1,2 @@
-# warcraft_log_aggregator
+# warcraft_logs_aggregator
 A script to aggregate performance metrics across multiple Warcraft Logs
