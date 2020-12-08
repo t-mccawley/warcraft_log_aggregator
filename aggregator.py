@@ -1,6 +1,11 @@
 import os
 import csv
 from enum import Enum
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+# Latest Log Added: 2/26/20
 
 class LogType(Enum):
     NONE = 0
@@ -10,63 +15,63 @@ class LogType(Enum):
 
 def parse_amount(amnt_str):
     ''' Parses the Amount field of a warcraft log to get raw amount'''
-    return(float(amnt_str.split('$')[0]))
+    return(int(amnt_str.split('$')[0]))
 
-class player_stats:
-    def __init__(self,name):
-        self.name = name
-        self.count = 0
-        self.damage_done = 0.0
-        self.damage_taken = 0.0
-        self.healing_done = 0.0
-
-    def _update_stats(self,log_type,row):
-        '''Updates the stats given new log type and row dict'''
-        if log_type == LogType.NONE:
-            print("ERROR: NONE")
-            return
-
-        self.count += 1 #TODO, actually need to count unique dates of raids
-        if log_type == LogType.DAMAGE_DONE:
-            self.damage_done += parse_amount(row['Amount'])
-        elif log_type == LogType.DAMAGE_TAKEN:
-            self.damage_taken += parse_amount(row['Amount'])
-        elif log_type == LogType.HEALING_DONE:
-            self.healing_done += parse_amount(row['Amount'])
+def update_df(df,log_type,row):
+    '''Updates the dataframe given new log type and row dict'''
+    if log_type == LogType.NONE:
+        print("ERROR: NONE")
         return
+    
+    # Initialize if new
+    name = row['Name']
+    if name not in df.index:
+        df.loc[name,['damage_done','damage_taken','healing_done']] = [0,0,0]
 
-    def __str__(self):
-        return("{}\n\tcount: {}\n\tdamage_done: {}\n\tdamage_taken: {}\n\thealing_done: {}".format(self.name,self.count,self.damage_done,self.damage_taken,self.healing_done))
+    # Add data from log
+    if log_type == LogType.DAMAGE_DONE:
+        df.loc[name,'damage_done'] += parse_amount(row['Amount'])
+    elif log_type == LogType.DAMAGE_TAKEN:
+        df.loc[name,'damage_taken'] += parse_amount(row['Amount'])
+    elif log_type == LogType.HEALING_DONE:
+        df.loc[name,'healing_done'] += parse_amount(row['Amount'])
+    return
 
-def determine_log_type(filename):
-    '''Determines the log type given filename'''
-    log_type_str = filename.split('_')[2].split('.')[0]
-    print(log_type_str)
-    if log_type_str == 'DD':
-        return(LogType.DAMAGE_DONE)
-    elif log_type_str == 'DT':
-        return(LogType.DAMAGE_TAKEN)
-    elif log_type_str == 'HD':
-        return(LogType.HEALING_DONE)
-    else:
-        return(LogType.NONE)
+def parse_metadata(reader):
+    '''Determines the meta data reader'''
+    if "DPS" in reader.fieldnames:
+        log_type = LogType.DAMAGE_DONE
+    elif "DTPS" in reader.fieldnames:
+        log_type = LogType.DAMAGE_TAKEN
+    elif "HPS" in reader.fieldnames:
+        log_type = LogType.HEALING_DONE
 
+    return(log_type)
 
-data = {} # dictionary of player name to player_stats
+# Create dataframe to store results
+df = pd.DataFrame(columns=['damage_done','damage_taken','healing_done'])
 directory = 'logs'
 for filename in os.listdir(directory):
     print()
     print("Reading: "+filename)
-    # get log type
-    log_type = determine_log_type(filename)
-    print(log_type)
     with open(directory+'/'+filename, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
+        log_type = parse_metadata(reader)
         for row in reader:
-            name = row['Name']
-            if name not in data:
-                data[name] = player_stats(name)
-            else:
-                data[name]._update_stats(log_type,row)
+            update_df(df,log_type,row)
 
-print(data['Akecheta'])
+print(df.loc['Akecheta'])
+
+# Compute percentage parameters
+parameters = [parameter for parameter in df.columns]
+for parameter in parameters:
+    df[parameter+"_pct"] = df[parameter] / sum(df[parameter]) * 100.0
+
+for parameter in parameters:
+    df.sort_values(by=parameter,ascending=True,inplace=True)
+    plt.figure()
+    mask = df[parameter+"_pct"] >= 0.5
+    plt.barh(df[mask].index,df[mask][parameter+"_pct"])
+    plt.title(parameter)
+
+plt.show()
