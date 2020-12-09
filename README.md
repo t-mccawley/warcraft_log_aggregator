@@ -3,6 +3,6 @@ A script to aggregate performance metrics across multiple [Warcraft Logs](https:
 
 Example ouput plots:
 
-[total_damage_done](media/total_damage_done.png)
+![total_damage_done](media/total_damage_done.png)
 
-[avg_hps](media/avg_hps.png)
+![avg_hps](media/avg_hps.png)
